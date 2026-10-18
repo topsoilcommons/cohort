@@ -190,6 +190,40 @@ test('POST /api/projects/adopt rejects a non-GitHub repo URL', async () => {
   assert.equal(res.status, 400);
 });
 
+// Why: the adopt success path and its duplicate guard had no coverage; only
+// the non-GitHub rejection was tested, so a regression that double-lists a
+// repo or drops the adopted activity entry would pass the suite silently.
+test('POST /api/projects/adopt creates a squad for a GitHub repo, then returns the same one', async () => {
+  const repo = 'https://github.com/example/adopt-me';
+  const first = await fetch(`${BASE}/api/projects/adopt`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ repo, handle: 'adopter_test' }),
+  });
+  assert.equal(first.status, 201);
+  const created = await first.json();
+  assert.equal(created.repo, repo);
+  assert.equal(created.founder, 'adopter_test');
+  assert.equal(created.demo, false);
+
+  const fetchedRes = await fetch(`${BASE}/api/projects/${created.id}`);
+  const fetched = await fetchedRes.json();
+  assert.equal(fetched.activity.at(-1).kind, 'adopted');
+
+  const boardBefore = await (await fetch(`${BASE}/api/projects`)).json();
+  const second = await fetch(`${BASE}/api/projects/adopt`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ repo: `${repo}/`, handle: 'someone_else' }),
+  });
+  assert.equal(second.status, 200);
+  const again = await second.json();
+  assert.equal(again.existing, true);
+  assert.equal(again.id, created.id);
+  const boardAfter = await (await fetch(`${BASE}/api/projects`)).json();
+  assert.equal(boardAfter.length, boardBefore.length);
+});
+
 // --- MCP server over stdio ----------------------------------------------------
 
 function mcpClient() {
