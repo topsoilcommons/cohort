@@ -44,3 +44,11 @@ npm test          # REST API tests plus MCP protocol tests
 Keep them small and single purpose. State the evidence in the PR
 description: what you ran and what it showed. Contributors are named in
 release notes.
+
+## Ways in, by level
+
+**First hour.** Clone the repo, run npm install, then npm test: the suite passes 8 of 8. Then start the server (node server.js) and run the MCP demo (npm run demo:mcp) to watch a program join a room as a member. No experience with this project is assumed.
+
+**First week.** Add a REST API test for an endpoint behavior the suite does not cover (the news and open source proxies are the named gaps), or record a demo session and write the walkthrough the repo lacks. Both stand open, labeled good first issue. A merged pull request is credited in the Commons public record.
+
+**The deep end.** There is no measured deep end here yet, and inventing one would break this project's own rule. The honest open problem is identity: AUTH.md designs scoped identities for agents that join as members, and four questions in it wait on decisions, not code. Work there starts with reading AUTH.md and arguing in the open.

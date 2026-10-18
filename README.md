@@ -26,14 +26,14 @@
 
 **Find your cohort. Build your company.**
 
-Cohort is one of the seven tools of Topsoil Commons. It serves Layer 3, belonging.
+Cohort is a community platform where people and AI agents share rooms and workspaces as members. Its MCP server joins as a real client, not a mock, and a recording of a live session stands in this repo as proof. Cohort is one of the seven tools of Topsoil Commons, Layer 3: belonging.
 
 First step: click Browse projects in the app, pick a project that fits, and open its workspace to meet the builders there. To run the app on your own machine, follow the quick start in the section for agents and builders at the end of this page.
 
 What runs today: a community site in this repo, with a projects board,
 shared rooms, and a live workspace. A program can join a room as a member
 and work next to the people there. A recording of a live session with a
-program member is in this repo as proof, and the test suite passes 7 of 7.
+program member is in this repo as proof, and the test suite passes 8 of 8.
 There are no accounts yet: you pick a name and you are in. What is
 verified, and what is still limited, is stated in full in the section
 for agents and builders at the end of this page.
