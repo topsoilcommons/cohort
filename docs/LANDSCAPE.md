@@ -208,3 +208,139 @@ Metadata pattern with CIMD or pre-registration, not DCR; and (2) token
 lifetime defaults should lean short and, for a hosted HTTP instance,
 audience bound to that one instance. Direction stays human; the
 implementation queue item remains gated as recorded in CHECKLIST.md.
+
+## Evening scan, October 18, 2026: token lifetime, revocation, and agent identity registries
+
+A second focused micro scan, on a fresh angle the October 17 evening
+scan did not cover: it said lifetimes should lean short, but gave no
+numbers, no revocation mechanism, and no look at identity registries.
+This scan covers those three. It changes no decision in docs/AUTH.md,
+implements nothing, and leaves scoped agent identities gated on
+Joshua's answers to the four open questions in that document.
+
+**Token lifetimes now have concrete, converging numbers.** A
+vendor-neutral February 23, 2026 comparison of credential options for
+agents and other non-human identities puts typical lifetimes at: OAuth
+JWT access tokens 5 to 15 minutes (revocation often implicit, meaning
+wait for expiry), opaque access tokens checked by introspection 1 to
+10 minutes (revocation can be immediate if the API introspects),
+refresh tokens hours to weeks (with the note that they should be
+shorter for non-human identities, and rotation recommended), workload
+identity federation credentials 5 to 60 minutes, SPIFFE/SPIRE SVIDs
+minutes to hours (rotated automatically), static API keys months to
+never (labeled bad), and mTLS client certificates days to months
+(revocation via CRL or OCSP, with operational overhead). Its workable
+defaults are access tokens at 5 to 10 minutes, no refresh token for
+non-human identities if possible (or 1 to 24 hours with rotation if
+required), and SVID certificates rotating every 1 to 4 hours.
+
+- https://learn-iam.com/blog/token-security-for-ai-agents-and-non-human-identities
+
+What it means for this project: AUTH.md open question 4 (token
+lifetime and storage) now has a concrete range to decide against,
+rather than just a direction. If Cohort's scoped tokens are ever
+issued for a hosted instance, the practice above points to minutes,
+not days, and to avoiding a long lived refresh style token for agents.
+For the local demo, where tokens are not yet implemented at all, this
+changes nothing.
+
+**Revocation is a separate mechanism from expiry, and self-contained
+tokens do not get it for free.** The same comparison notes that a JWT
+cannot be revoked before expiry without an added layer. Two IETF
+drafts, both work in progress and neither an RFC, describe that layer.
+The OAuth Status List draft defines a compressed bit array in which
+each referenced token has an index and a status (VALID, INVALID,
+meaning revoked and irreversible, or SUSPENDED, meaning temporarily
+invalid and reversible); a list can carry the statuses of 100,000 or
+more tokens while staying small, and grouping many tokens in one list
+gives what the draft calls herd privacy, because a checker does not
+reveal which single token it is checking. The Global Token Revocation
+draft (February 2026, expires August 29, 2026) defines an endpoint by
+which an identity provider or incident tool can ask an authorization
+server to revoke all of one subject's tokens: the server MUST revoke
+all active refresh tokens, SHOULD invalidate access tokens (the draft
+states plainly that this may not be technically feasible for
+self-contained tokens, and points to the Status List as one remedy),
+and MUST require re-authentication before issuing new tokens; success
+is a 204, and revocation may complete asynchronously after it.
+
+- https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-00.xml
+- https://www.ietf.org/archive/id/draft-parecki-oauth-global-token-revocation-06.html
+
+What it means for this project: this is quietly favorable to Cohort's
+current shape. A token checked against a server side record, as a
+single instance checking its own store would, is the reference token
+case the revocation draft describes as revocable by removing it from
+storage. The hard revocation problem only arrives if tokens become
+self-contained and are checked offline. Flag for Joshua's question 4
+answer, not a change: keep tokens server checked while Cohort is a
+single instance, and do not adopt self-contained tokens without also
+adopting a status or introspection check.
+
+**Workload identity replaces revocation with automatic rotation.**
+A September 2, 2026 end to end SPIFFE demo for AI agents issues
+five-minute X.509 SVIDs, renews at roughly half the lifetime, and swaps
+the certificate in place with no restart and no secret ever written to
+a file: identity is attested from properties of the workload, not from
+a secret it holds. The demo also keeps identity and authorization
+separate: a second agent with a valid SVID from the same trust domain
+still received HTTP 403, because policy allowed only the first agent's
+SPIFFE ID.
+
+- https://dev.to/webofmike/spiffe-workload-identity-for-ai-agents-end-to-end-8ag
+- https://www.hashicorp.com/en/blog/spiffe-securing-the-identity-of-agentic-ai-and-non-human-actors
+
+What it means for this project: SPIFFE is the working form of the
+workload federation idea the October 17 scan flagged as still a draft
+inside MCP (SEP-1933), but it is infrastructure for deployed
+workloads, not a fit for Cohort's local MCP demo, which has no SPIRE
+server, no attested workload, and no host yet. No revisit needed. The
+transferable lesson is narrower: short lifetimes only stop being
+operational pain when renewal is automatic, and Cohort's design has
+no automatic renewal, which is another reason any first token
+lifetime Joshua picks should be a deliberate trade, not a copied
+default.
+
+**Agent identity registries exist now, but they are public and
+permanent by design, the opposite of Cohort's room record.** ERC-8004,
+proposed in August 2025 and live on Ethereum mainnet in January 2026,
+defines three on-chain registries: Identity (each agent gets a
+permanent on-chain ID as an ERC-721 token), Reputation (feedback from
+users and other agents), and Validation (third party verification of
+agent actions). A May 2026 research proposal from the Ethereum
+Foundation's Privacy and Scaling Explorations team, Anonymous
+Credentials for Trustless Agents (ACTA), exists precisely because
+that design creates a permanent, public interaction graph between
+agents and their clients, and proposes zero-knowledge proofs so an
+agent can prove it meets a policy, including operating under a
+verified human's authorization, without exposing that identity. ACTA
+is a research draft with its own open questions (anonymity set size,
+issuer centralization, proof cost), not a shipped fix.
+
+- https://www.cryptopolitan.com/pse-proposes-acta-privacy-layer-for-erc-8004/
+
+What it means for this project: a public registry is not a missing
+piece Cohort should adopt. Cohort's record of an agent is its room
+activity log: local, operator bound under AUTH.md, and visible to the
+people in the room, which serves belonging (Layer 3) without putting a
+permanent public graph under every agent and operator. The registry
+landscape is evidence that agent identity is being built in several
+incompatible places at once (spec drafts, workload identity, on-chain
+registries), which reinforces AUTH.md's choice to keep Cohort's
+identity local and its format recheckable later, rather than binding
+rooms to any one external registry now.
+
+## Verdict of this scan
+
+AUTH.md is strengthened again, and open question 4 is sharper:
+lifetimes in current practice are minutes (5 to 15 for JWT access
+tokens, 1 to 10 for introspected opaque tokens), revocation is easy
+only while tokens stay server checked, and automatic rotation is what
+makes minute scale lifetimes livable in the workload world. Two flags
+for Joshua, neither changing the decision: (1) if hosted tokens are
+issued, pick a minute scale lifetime and no long lived agent refresh
+token, per the ranges above; and (2) do not move to self-contained
+tokens, or to any external agent registry, without a revocation and
+privacy answer to go with it. Scoped agent identities remain gated on
+Joshua's answers, exactly as recorded in CHECKLIST.md, and the uptime
+demo still needs Joshua's own signup; neither was attempted here.
