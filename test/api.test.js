@@ -297,3 +297,40 @@ test('MCP server: handshake, tool list with output schemas, and real tool calls'
     proc.kill('SIGTERM');
   }
 });
+
+// Why: update_doc had no coverage at all; a regression that dropped the edit or its activity entry would pass silently, and agents plan from the shared doc.
+test('MCP server: update_doc replaces the shared document and records it in the task history', async () => {
+  const res = await fetch(`${BASE}/api/projects`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Doc Project', pitch: 'Created by the automated test suite to check the MCP doc tool.', founder: 'test_runner', tags: ['tests'] }),
+  });
+  assert.equal(res.status, 201);
+  const created = await res.json();
+
+  const { proc, call, notify } = mcpClient();
+  try {
+    const init = await call('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'cohort-tests', version: '1.0.0' } });
+    assert.equal(init.result.serverInfo.name, 'cohort-mcp');
+    notify('notifications/initialized');
+
+    const docText = '# Doc Project notes\n\nUpdated by the automated MCP test.';
+    const updated = await call('tools/call', { name: 'update_doc', arguments: { project_id: created.id, text: docText } });
+    assert.equal(updated.result.isError, false);
+    assert.equal(updated.result.structuredContent.updated, true);
+    assert.equal(updated.result.structuredContent.doc, docText);
+
+    const state = await call('tools/call', { name: 'get_room_state', arguments: { project_id: created.id } });
+    assert.equal(state.result.isError, false);
+    assert.equal(state.result.structuredContent.doc, docText);
+
+    const history = await call('tools/call', { name: 'get_task_history', arguments: { project_id: created.id } });
+    assert.equal(history.result.isError, false);
+    const last = history.result.structuredContent.activity.at(-1);
+    assert.equal(last.kind, 'doc');
+    assert.equal(last.actor, 'agent');
+    assert.match(last.detail, /Document updated by agent/);
+  } finally {
+    proc.kill('SIGTERM');
+  }
+});
