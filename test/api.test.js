@@ -334,3 +334,46 @@ test('MCP server: update_doc replaces the shared document and records it in the 
     proc.kill('SIGTERM');
   }
 });
+
+// Why: create_project and upvote_project were the last two of the 8 MCP tools the
+// suite listed but never called; a regression in either would pass silently, and
+// creating and backing projects is the board's core agent workflow.
+test('MCP server: create_project and upvote_project work end to end', async () => {
+  const { proc, call, notify } = mcpClient();
+  try {
+    const init = await call('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'cohort-tests', version: '1.0.0' } });
+    assert.equal(init.result.serverInfo.name, 'cohort-mcp');
+    notify('notifications/initialized');
+
+    const created = await call('tools/call', { name: 'create_project', arguments: { name: 'MCP Created Project', pitch: 'Created by the automated MCP test to check the create and upvote tools.', founder: 'test_runner', tags: ['tests'] } });
+    assert.equal(created.result.isError, false);
+    const project = created.result.structuredContent;
+    assert.ok(project.id, 'the created project carries an id');
+    assert.equal(project.name, 'MCP Created Project');
+    assert.equal(project.founder, 'test_runner');
+    assert.equal(project.upvotes, 0);
+
+    const fetched = await call('tools/call', { name: 'get_project', arguments: { project_id: project.id } });
+    assert.equal(fetched.result.isError, false);
+    assert.equal(fetched.result.structuredContent.id, project.id);
+    assert.equal(fetched.result.structuredContent.name, 'MCP Created Project');
+
+    const upvoted = await call('tools/call', { name: 'upvote_project', arguments: { project_id: project.id, handle: 'test_runner' } });
+    assert.equal(upvoted.result.isError, false);
+    assert.equal(upvoted.result.structuredContent.ok, true);
+    assert.equal(upvoted.result.structuredContent.upvotes, 1);
+
+    const repeat = await call('tools/call', { name: 'upvote_project', arguments: { project_id: project.id, handle: 'test_runner' } });
+    assert.equal(repeat.result.isError, true);
+    assert.equal(repeat.result.structuredContent.error, 'conflict');
+
+    const history = await call('tools/call', { name: 'get_task_history', arguments: { project_id: project.id } });
+    assert.equal(history.result.isError, false);
+    const kinds = history.result.structuredContent.activity.map(a => a.kind);
+    assert.deepEqual(kinds, ['created', 'upvote']);
+    assert.equal(history.result.structuredContent.activity[0].actor, 'test_runner');
+    assert.equal(history.result.structuredContent.activity[1].actor, 'test_runner');
+  } finally {
+    proc.kill('SIGTERM');
+  }
+});
