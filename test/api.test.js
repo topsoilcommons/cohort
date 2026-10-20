@@ -224,6 +224,26 @@ test('POST /api/projects/adopt creates a squad for a GitHub repo, then returns t
   assert.equal(boardAfter.length, boardBefore.length);
 });
 
+// Why: the workspace page route had no coverage; it serves the room page
+// for any project id, so a regression that broke sendFile or made the
+// route validate ids would pass the suite silently. Pinning the unknown
+// id case documents the current behaviour, it does not endorse changing it.
+test('GET /p/:id serves the workspace page for a known and an unknown project id', async () => {
+  const res = await fetch(`${BASE}/p/seed-verdant`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /text\/html/);
+  const body = await res.text();
+  assert.match(body, /<title>Workspace: Cohort<\/title>/);
+  assert.ok(body.includes('id="ws-editor"'), 'served body is the workspace page');
+
+  const unknown = await fetch(`${BASE}/p/does-not-exist`);
+  assert.equal(unknown.status, 200);
+  assert.match(unknown.headers.get('content-type'), /text\/html/);
+  const unknownBody = await unknown.text();
+  assert.match(unknownBody, /<title>Workspace: Cohort<\/title>/);
+  assert.ok(unknownBody.includes('id="ws-editor"'), 'unknown id still serves the workspace page');
+});
+
 // --- MCP server over stdio ----------------------------------------------------
 
 function mcpClient() {
