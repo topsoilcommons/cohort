@@ -155,6 +155,45 @@ test('upvote works once per handle, then conflicts', async () => {
 // agent returning to a room plans from it, so creation and upvote must be
 // recorded in order, with the actor named, on the single-project read
 // (the board list stays free of room internals, per the first test).
+// Why: the upvote endpoint's error branches had no coverage; only the
+// success and repeat-vote conflict paths on a known project were tested,
+// so a regression that let an anonymous vote through, or that answered
+// 200 for a project that does not exist, would pass the suite silently
+// and inflate the board's backing counts.
+test('upvote rejects an unknown project with 404 and a missing handle with 400, recording no vote', async () => {
+  const before = await fetch(`${BASE}/api/projects/seed-verdant`);
+  assert.equal(before.status, 200);
+  const upvotesBefore = (await before.json()).upvotes;
+
+  const missing = await fetch(`${BASE}/api/projects/does-not-exist/upvote`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ handle: 'ghost_voter' }),
+  });
+  assert.equal(missing.status, 404);
+  assert.equal((await missing.json()).error, 'Project not found');
+
+  const noHandle = await fetch(`${BASE}/api/projects/seed-verdant/upvote`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+  assert.equal(noHandle.status, 400);
+  assert.equal((await noHandle.json()).error, 'handle is required');
+
+  const blankHandle = await fetch(`${BASE}/api/projects/seed-verdant/upvote`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ handle: '   ' }),
+  });
+  assert.equal(blankHandle.status, 400);
+  assert.equal((await blankHandle.json()).error, 'handle is required');
+
+  const after = await fetch(`${BASE}/api/projects/seed-verdant`);
+  assert.equal(after.status, 200);
+  assert.equal((await after.json()).upvotes, upvotesBefore, 'failed upvotes record no vote');
+});
+
 test('room activity log records creation and upvote in order', async () => {
   const res = await fetch(`${BASE}/api/projects`, {
     method: 'POST',
