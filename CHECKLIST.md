@@ -49,6 +49,8 @@ Each item needs a short spec with a verify by line before a daily pass picks it 
 - The one remaining step, Joshua's alone: sign up at render.com with the GitHub account (no card on the free route), choose New then Blueprint, pick this repo, and confirm the free plan. Render then builds it and issues the public address.
 - Limits of the free tier, as recorded in the README: the service sleeps after about 15 minutes idle and takes about a minute to wake; the disk is temporary, so the app reseeds its demo data on restart; one small process, a demonstration, not a production home.
 
+- [x] REST coverage for the project creation non-GitHub repo check, October 21, 2026 (evening): every creation test omitted the repo field and the adopt tests exercise the separate adopt handler's check, so the creation handler's repo validation had no coverage; a new test now pins it (creating a project with a non-GitHub repo URL, or a GitHub URL missing the repo segment, returns 400 with error 'repo must be a github.com/owner/name URL', the board length is unchanged, and the rejected project is not listed). Evidence: npm test 15 of 15, twice in a row on the same working tree (baseline 14 of 14). Scoped agent identities remain gated above, so this queued-adjacent coverage item was taken instead, per the skip rule.
+
 ## Working agreements
 - AGENTS.md in this repo governs how changes are made and proven here.
 - Known limits, stated in the README and not hidden here: no accounts or auth yet, document sync is last write wins, and persistence is a single data.json file for one server process.

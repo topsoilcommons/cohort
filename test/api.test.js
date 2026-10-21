@@ -312,6 +312,35 @@ test('GET /p/:id serves the workspace page for a known and an unknown project id
   assert.ok(unknownBody.includes('id="ws-editor"'), 'unknown id still serves the workspace page');
 });
 
+// Why: the project creation endpoint's repo check had no coverage; every
+// creation test omits the repo field, and the adopt tests exercise the
+// separate adopt handler's check, so a regression that let a non-GitHub
+// repo link through on creation would pass the suite silently and list
+// a project pointing outside GitHub.
+test('POST /api/projects rejects a non-GitHub repo URL with 400, creating no project', async () => {
+  const boardBefore = await (await fetch(`${BASE}/api/projects`)).json();
+
+  const badRepo = await fetch(`${BASE}/api/projects`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Bad Repo Project', pitch: 'Created by the automated test suite to check the repo check.', founder: 'test_runner', repo: 'https://example.com/not/github' }),
+  });
+  assert.equal(badRepo.status, 400);
+  assert.equal((await badRepo.json()).error, 'repo must be a github.com/owner/name URL');
+
+  const incomplete = await fetch(`${BASE}/api/projects`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Bad Repo Project', pitch: 'Created by the automated test suite to check the repo check.', founder: 'test_runner', repo: 'https://github.com/onlyowner' }),
+  });
+  assert.equal(incomplete.status, 400);
+  assert.equal((await incomplete.json()).error, 'repo must be a github.com/owner/name URL');
+
+  const boardAfter = await (await fetch(`${BASE}/api/projects`)).json();
+  assert.equal(boardAfter.length, boardBefore.length, 'failed creations create no project');
+  assert.ok(!boardAfter.some((proj) => proj.name === 'Bad Repo Project'), 'the rejected project is not listed on the board');
+});
+
 // --- MCP server over stdio ----------------------------------------------------
 
 function mcpClient() {
