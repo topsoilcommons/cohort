@@ -263,6 +263,35 @@ test('POST /api/projects/adopt creates a squad for a GitHub repo, then returns t
   assert.equal(boardAfter.length, boardBefore.length);
 });
 
+// Why: the adopt endpoint's handle check had no coverage; every adopt
+// test supplies a handle, and the non-GitHub test fails the earlier repo
+// check first, so a regression that let an anonymous adoption through
+// would pass the suite silently and create a squad with no founder.
+test('POST /api/projects/adopt rejects a missing handle with 400, creating no project', async () => {
+  const repo = 'https://github.com/example/needs-a-handle';
+  const boardBefore = await (await fetch(`${BASE}/api/projects`)).json();
+
+  const noHandle = await fetch(`${BASE}/api/projects/adopt`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ repo }),
+  });
+  assert.equal(noHandle.status, 400);
+  assert.equal((await noHandle.json()).error, 'handle is required');
+
+  const blankHandle = await fetch(`${BASE}/api/projects/adopt`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ repo, handle: '   ' }),
+  });
+  assert.equal(blankHandle.status, 400);
+  assert.equal((await blankHandle.json()).error, 'handle is required');
+
+  const boardAfter = await (await fetch(`${BASE}/api/projects`)).json();
+  assert.equal(boardAfter.length, boardBefore.length, 'failed adoptions create no project');
+  assert.ok(!boardAfter.some((proj) => proj.repo === repo), 'the rejected repo is not listed on the board');
+});
+
 // Why: the workspace page route had no coverage; it serves the room page
 // for any project id, so a regression that broke sendFile or made the
 // route validate ids would pass the suite silently. Pinning the unknown
